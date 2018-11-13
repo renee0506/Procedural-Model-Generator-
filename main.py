@@ -99,13 +99,23 @@ class World(ShowBase):
 
         self.models = set()
 
-        # Load the environment model.
-        self.scene = self.loader.loadModel("models/environment")
+        #Disable default mouse movement
+        base.disableMouse()
+        # Load the ground model.
+        self.scene = self.loader.loadModel("models/ground")
         # Reparent the model to render.
         self.scene.reparentTo(self.render)
         # Apply scale and position transforms on the model.
-        self.scene.setScale(0.25, 0.25, 0.25)
-        self.scene.setPos(-8, 42, 0)
+        self.scene.setScale(2, 2, 2)
+        self.scene.setPos(0, 0, 0)
+        self.taskMgr.add(self.setCameraTask, "SetCameraTask")
+
+    #Set the initial camera position
+    def setCameraTask(self, task):
+        self.camera.setPos(0, -15, 70)
+        self.camera.setHpr(0, -80, 0)
+        return Task.done
+
 
     def bindToWindow(self, windowHandle):
         wp = WindowProperties().getDefault()
