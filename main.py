@@ -13,13 +13,13 @@ from PySide2.QtCore import *
 #Panda3D imports
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
-from panda3d.core import Point3, WindowProperties
-
+from panda3d.core import Point3, WindowProperties, Material
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
 #Python Module imports
 from math import pi, sin, cos, sqrt
+from functools import partial
 import sys
 
 #Constants
@@ -31,9 +31,19 @@ class Model(object):
     def __init__(self, path, model):
         self.path = path
         self.model = model
+        #Assign a default material
+        self.model.setColor((1,0,0,1))
+        self.material = Material()
+        self.material.setDiffuse((1,0,0,1))
+        self.model.setMaterial(self.material)
+        self.model.setShaderAuto()
 
     def __repr__(self):
         return "Model at " + self.path
+
+    def changeMaterialColor(self, color):
+        self.material.setAmbient(color)
+        self.model.setMaterial(self.material)
 
 #The Main Program Window (GUI)
 class QTWindow(QWidget):
@@ -93,8 +103,20 @@ class QTWindow(QWidget):
         isWall.setChecked(False)
         vbox = QVBoxLayout()
         vbox.addWidget(isWall)
+        selectColor = QPushButton("Select Color")
+        selectColor.clicked.connect(partial(self.changeColor, model))
+        selectColor.setStyleSheet("QWidget {background-color: %s }" %Qt.gray)
+        vbox.addWidget(selectColor)
         groupBox.setLayout(vbox)
         self.modelLstLayout.addWidget(groupBox)
+
+    def changeColor(self, m):
+        picker = QColorDialog()
+        if picker.exec_():
+            color = picker.selectedColor().getRgbF()
+            print(color)
+            m.model.setColor(color)
+
 
 #The resizable widget holding the panda3D window
 class QTPandaWidget(QWidget):
