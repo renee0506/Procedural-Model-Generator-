@@ -27,10 +27,13 @@ P3D_WIN_WIDTH = 400
 P3D_WIN_HEIGHT = 240
 
 class Model(object):
+    #Class attribute holding all models
+    allModels = list()
 
     def __init__(self, path, model):
         self.path = path
         self.model = model
+        self.label = "Wall"
         #Assign a default material
         self.model.setColor((1,0,0,1))
         self.material = Material()
@@ -44,6 +47,18 @@ class Model(object):
     def changeMaterialColor(self, color):
         self.material.setAmbient(color)
         self.model.setMaterial(self.material)
+
+    def changeLabel(self, dummy, index):
+        switcher = {
+            0 : "Wall",
+            1 : "Pole"
+        }
+        self.label = switcher.get(index)
+        print(self.label)
+
+    @staticmethod
+    def generate():
+        print(Model.allModels[0].path)
 
 #The Main Program Window (GUI)
 class QTWindow(QWidget):
@@ -79,10 +94,13 @@ class QTWindow(QWidget):
 
     def generateButtons(self):
         buttonWidget = QWidget()
-        lyt = QHBoxLayout()
+        lyt = QVBoxLayout()
         addModelButton = QPushButton("Add")
         addModelButton.clicked.connect(self.addModel)
         lyt.addWidget(addModelButton)
+        generateButton = QPushButton("Generate")
+        generateButton.clicked.connect(Model.generate)
+        lyt.addWidget(generateButton)
         buttonWidget.setLayout(lyt)
         self.menulayout.addWidget(buttonWidget)
 
@@ -99,8 +117,10 @@ class QTWindow(QWidget):
     #Renew the List of Models on GUI
     def addModelUI(self, model):
         groupBox = QGroupBox(model.path.split("/")[-1])
-        isWall = QRadioButton("Wall")
-        isWall.setChecked(False)
+        isWall = QComboBox()
+        isWall.addItems(["Wall", "Pole"])
+        isWall.currentIndexChanged.connect(partial(model.changeLabel,
+                                                   isWall.currentIndex()))
         vbox = QVBoxLayout()
         vbox.addWidget(isWall)
         selectColor = QPushButton("Select Color")
@@ -110,13 +130,13 @@ class QTWindow(QWidget):
         groupBox.setLayout(vbox)
         self.modelLstLayout.addWidget(groupBox)
 
+    #Popout the UI element for changing color
     def changeColor(self, m):
         picker = QColorDialog()
         if picker.exec_():
             color = picker.selectedColor().getRgbF()
             print(color)
             m.model.setColor(color)
-
 
 #The resizable widget holding the panda3D window
 class QTPandaWidget(QWidget):
@@ -138,8 +158,6 @@ class QTPandaWidget(QWidget):
 class World(ShowBase):
     def __init__(self):
         ShowBase.__init__(self)
-
-        self.models = set()
 
         #Disable default mouse movement
         base.disableMouse()
@@ -188,7 +206,7 @@ class World(ShowBase):
         model.setScale(2,2,2)
         model.reparentTo(self.scene)
         modelObj = Model(fileName, model)
-        self.models.add(modelObj)
+        Model.allModels.append(modelObj)
         self.window.addModelUI(modelObj)
 
     def fn(self, dir, num):
