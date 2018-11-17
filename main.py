@@ -19,7 +19,7 @@ from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
 #Python Module imports
-from math import pi, sin, cos
+from math import pi, sin, cos, sqrt
 import sys
 
 #Constants
@@ -133,13 +133,15 @@ class World(ShowBase):
         #Refering to the front-end
         self.window = None
 
-        #Keyboard Events
-        self.accept("arrow_up-up", self.fn, ["forward", 0])
+        #Events
         self.accept("wheel_up", self.zoom, [1])
         self.accept("wheel_down", self.zoom, [-1])
-
-        #Mouse Events
-        self.mouseTask = taskMgr.add(self.mouseTask, "Mouse Task")
+        self.accept("q-repeat", self.rotate, [1])
+        self.accept("e-repeat", self.rotate, [-1])
+        self.accept("w-repeat", self.move, ["up"])
+        self.accept("s-repeat", self.move, ["down"])
+        self.accept("a-repeat", self.move, ["left"])
+        self.accept("d-repeat", self.move, ["right"])
 
 
     #Set the initial camera position
@@ -162,7 +164,7 @@ class World(ShowBase):
         model = self.loader.loadModel(fileName)
         model.setPos(0, 0, 0)
         model.setScale(2,2,2)
-        model.reparentTo(self.render)
+        model.reparentTo(self.scene)
         modelObj = Model(fileName, model)
         self.models.add(modelObj)
         self.window.addModelUI(modelObj)
@@ -176,18 +178,22 @@ class World(ShowBase):
         if distance + dir > 0:
             base.camLens.setFocalLength(distance + dir)
 
-    def mouseTask(self, task):
-        mw = self.mouseWatcherNode
+    #Method to rotate the scene
+    def rotate(self, dir):
+        self.scene.setH(self.scene.getH() + 5 * dir)
 
-        hasMouse = mw.hasMouse()
-        if hasMouse:
-            x = base.mouseWatcherNode.getMouseX()
-            y = base.mouseWatcherNode.getMouseY()
-
-        return Task.cont
-
-
-
+    #Method to move around
+    def move(self, dir):
+        print("In Move")
+        pos = self.camera.getPos()
+        if dir == "up":
+            self.camera.setPos(pos[0], pos[1] + 1, pos[2])
+        elif dir == "down":
+            self.camera.setPos(pos[0], pos[1] - 1, pos[2])
+        elif dir == "left":
+            self.camera.setPos(pos[0] - 1, pos[1], pos[2])
+        else:
+            self.camera.setPos(pos[0] + 1, pos[1], pos[2])
 
 
 if __name__ == '__main__':
