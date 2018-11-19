@@ -40,6 +40,8 @@ class Model(object):
         self.material.setDiffuse((1,0,0,1))
         self.model.setMaterial(self.material)
         self.model.setShaderAuto()
+        self.width = 0
+        self.height = 0
 
     def __repr__(self):
         return "Model at " + self.path
@@ -54,11 +56,73 @@ class Model(object):
             1 : "Pole"
         }
         self.label = switcher.get(index)
-        print(self.label)
+
+    # Add Label-Specific UI
+    def addLabelUI(self, dummy, layout, index):
+        print("yay!")
+        print(index)
+        print(layout)
+        print(dummy)
+        if index == 0:  # If it is wall
+            widthLabel = QLabel("Width")
+            width = QSlider(Qt.Horizontal)
+            heightLabel = QLabel("Height")
+            height = QSlider(Qt.Horizontal)
+            width.setMinimum(1)
+            width.setMaximum(10)
+            width.valueChanged.connect(
+                partial(self.changeWValue, width.value()))
+            height.setMinimum(1)
+            height.setMaximum(10)
+            height.valueChanged.connect(
+                partial(self.changeHValue, height.value()))
+            layout.addWidget(widthLabel)
+            layout.addWidget(width)
+            layout.addWidget(heightLabel)
+            layout.addWidget(height)
+        self.changeLabel(dummy, index)
+
+    def changeWValue(self, state, w):
+        self.width = round(w)
+
+    def changeHValue(self, state, h):
+        self.height = round(h)
+
 
     @staticmethod
-    def generate():
-        print(Model.allModels[0].path)
+    def generate(scene):
+        a = Model.allModels
+        wall = [m for m in Model.allModels if m.label == "Wall"][0]
+        pole = [m for m in Model.allModels if m.label == "Pole"][0]
+        #print(wall.model.getTightBounds())
+        bounds = wall.model.getTightBounds()
+        minX = bounds[0][0]
+        minY = bounds[0][1]
+        minZ = bounds[0][2]
+        maxX, maxY, maxZ = bounds[1][0], bounds[1][1], bounds[1][2]
+        currentX = 0
+        currentY = - (maxX - minX) / 2
+        walls = scene.attachNewNode("Walls")
+        print("Wall Height", wall.height)
+        for i in range(wall.width):
+            wallInstance = walls.attachNewNode("wall-instance")
+            wallInstanceMirror = walls.attachNewNode("wall-instance-mirror")
+            wallInstance.setPos(currentX + maxX - minX, 0, 0)
+            wallInstanceMirror.setPos(currentX + maxX - minX, (maxX - minX) * wall.height, 0)
+            currentX += (maxX - minX)
+            wall.model.instanceTo(wallInstance)
+            wall.model.instanceTo(wallInstanceMirror)
+        for i in range(wall.height):
+            wallInstance = walls.attachNewNode("wall-instance")
+            wallInstanceMirror = walls.attachNewNode("wall-instance-mirror")
+            wallInstance.setHpr(90, 0, 0)
+            wallInstance.setPos((maxX- minX) / 2, currentY + maxX - minX, 0)
+            wallInstanceMirror.setPos((maxX- minX) / 2 + (maxX - minX) * wall.width,
+                                      currentY + maxX - minX, 0)
+            wallInstanceMirror.setHpr(90, 0, 0)
+            currentY += (maxX - minX)
+            wall.model.instanceTo(wallInstance)
+            wall.model.instanceTo(wallInstanceMirror)
 
 #The Main Program Window (GUI)
 class QTWindow(QWidget):
@@ -99,7 +163,7 @@ class QTWindow(QWidget):
         addModelButton.clicked.connect(self.addModel)
         lyt.addWidget(addModelButton)
         generateButton = QPushButton("Generate")
-        generateButton.clicked.connect(Model.generate)
+        generateButton.clicked.connect(partial(Model.generate, self.program.scene))
         lyt.addWidget(generateButton)
         buttonWidget.setLayout(lyt)
         self.menulayout.addWidget(buttonWidget)
@@ -117,15 +181,17 @@ class QTWindow(QWidget):
     #Renew the List of Models on GUI
     def addModelUI(self, model):
         groupBox = QGroupBox(model.path.split("/")[-1])
+        vbox = QVBoxLayout()
         isWall = QComboBox()
+        vbox.addWidget(isWall)
         isWall.addItems(["Wall", "Pole"])
         isWall.currentIndexChanged.connect(partial(model.changeLabel,
                                                    isWall.currentIndex()))
-        vbox = QVBoxLayout()
-        vbox.addWidget(isWall)
+        isWall.currentIndexChanged.connect(partial(model.addLabelUI,
+                                                   isWall.currentIndex(),
+                                                   vbox))
         selectColor = QPushButton("Select Color")
         selectColor.clicked.connect(partial(self.changeColor, model))
-        selectColor.setStyleSheet("QWidget {background-color: %s }" %Qt.gray)
         vbox.addWidget(selectColor)
         groupBox.setLayout(vbox)
         self.modelLstLayout.addWidget(groupBox)
@@ -137,6 +203,9 @@ class QTWindow(QWidget):
             color = picker.selectedColor().getRgbF()
             print(color)
             m.model.setColor(color)
+
+
+
 
 #The resizable widget holding the panda3D window
 class QTPandaWidget(QWidget):
