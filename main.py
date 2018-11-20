@@ -29,6 +29,10 @@ P3D_WIN_HEIGHT = 240
 class Model(object):
     #Class attribute holding all models
     allModels = list()
+    switcher = {
+        1: "Wall",
+        2: "Pole"
+    }
 
     def __init__(self, path, model):
         self.path = path
@@ -51,11 +55,8 @@ class Model(object):
         self.model.setMaterial(self.material)
 
     def changeLabel(self, dummy, index):
-        switcher = {
-            0 : "Wall",
-            1 : "Pole"
-        }
-        self.label = switcher.get(index)
+
+        self.label = Model.switcher.get(index)
 
     # Add Label-Specific UI
     def addLabelUI(self, dummy, layout, index):
@@ -63,10 +64,10 @@ class Model(object):
         print(index)
         print(layout)
         print(dummy)
-        if index == 0:  # If it is wall
+        if Model.switcher.get(index) == "Wall":  # If it is wall
             widthLabel = QLabel("Width")
             width = QSlider(Qt.Horizontal)
-            heightLabel = QLabel("Height")
+            heightLabel = QLabel("Length")
             height = QSlider(Qt.Horizontal)
             width.setMinimum(1)
             width.setMaximum(10)
@@ -91,38 +92,57 @@ class Model(object):
 
     @staticmethod
     def generate(scene):
-        a = Model.allModels
+        #Get Components from the user input
         wall = [m for m in Model.allModels if m.label == "Wall"][0]
-        pole = [m for m in Model.allModels if m.label == "Pole"][0]
+        tower = [m for m in Model.allModels if m.label == "Pole"][0]
+
         #print(wall.model.getTightBounds())
         bounds = wall.model.getTightBounds()
         minX = bounds[0][0]
-        minY = bounds[0][1]
-        minZ = bounds[0][2]
         maxX, maxY, maxZ = bounds[1][0], bounds[1][1], bounds[1][2]
-        currentX = 0
-        currentY = - (maxX - minX) / 2
+        currentX = - (maxX - minX) * wall.width / 2
+        currentY = - (maxX - minX) / 2 - (maxX - minX) * wall.height / 2
         walls = scene.attachNewNode("Walls")
-        print("Wall Height", wall.height)
+        walls.setPos(0,0,0)
+
+        #Generate walls on the width side
         for i in range(wall.width):
             wallInstance = walls.attachNewNode("wall-instance")
             wallInstanceMirror = walls.attachNewNode("wall-instance-mirror")
-            wallInstance.setPos(currentX + maxX - minX, 0, 0)
-            wallInstanceMirror.setPos(currentX + maxX - minX, (maxX - minX) * wall.height, 0)
+            wallInstance.setPos(walls, currentX + maxX - minX, currentY + (maxX- minX) / 2, 0)
+            wallInstanceMirror.setPos(walls, currentX + maxX - minX, currentY + (maxX- minX) / 2 + (maxX - minX) * wall.height, 0)
             currentX += (maxX - minX)
             wall.model.instanceTo(wallInstance)
             wall.model.instanceTo(wallInstanceMirror)
+
+        currentX = - (maxX - minX) * wall.width / 2
+        #Generate walls on the length side
         for i in range(wall.height):
             wallInstance = walls.attachNewNode("wall-instance")
             wallInstanceMirror = walls.attachNewNode("wall-instance-mirror")
             wallInstance.setHpr(90, 0, 0)
-            wallInstance.setPos((maxX- minX) / 2, currentY + maxX - minX, 0)
-            wallInstanceMirror.setPos((maxX- minX) / 2 + (maxX - minX) * wall.width,
+            wallInstance.setPos(walls, currentX + (maxX- minX) / 2, currentY + maxX - minX, 0)
+            wallInstanceMirror.setPos(walls, currentX + (maxX- minX) / 2 + (maxX - minX) * wall.width,
                                       currentY + maxX - minX, 0)
             wallInstanceMirror.setHpr(90, 0, 0)
             currentY += (maxX - minX)
             wall.model.instanceTo(wallInstance)
             wall.model.instanceTo(wallInstanceMirror)
+
+        #Generate Towers
+        towers = scene.attachNewNode("Towers")
+        towers.setPos(0,0,0)
+        wallBounds = walls.getTightBounds()
+        wallLocations = [(wallBounds[0][0], wallBounds[0][1]),
+                         (wallBounds[1][0], wallBounds[0][1]),
+                         (wallBounds[1][0], wallBounds[1][1]),
+                         (wallBounds[0][0], wallBounds[1][1])]
+        for location in wallLocations:
+            towerInstance = towers.attachNewNode("tower-instance")
+            towerInstance.setPos(location[0], location[1], 0)
+            tower.model.instanceTo(towerInstance)
+
+
 
 #The Main Program Window (GUI)
 class QTWindow(QWidget):
@@ -184,7 +204,7 @@ class QTWindow(QWidget):
         vbox = QVBoxLayout()
         isWall = QComboBox()
         vbox.addWidget(isWall)
-        isWall.addItems(["Wall", "Pole"])
+        isWall.addItems(["----", "Wall", "Pole"])
         isWall.currentIndexChanged.connect(partial(model.changeLabel,
                                                    isWall.currentIndex()))
         isWall.currentIndexChanged.connect(partial(model.addLabelUI,
@@ -235,7 +255,7 @@ class World(ShowBase):
         # Reparent the model to render.
         self.scene.reparentTo(self.render)
         # Apply scale and position transforms on the model.
-        self.scene.setScale(2, 2, 2)
+        self.scene.setScale(5, 5, 5)
         self.scene.setPos(0, 0, 0)
         self.taskMgr.add(self.setCameraTask, "SetCameraTask")
 
@@ -272,7 +292,7 @@ class World(ShowBase):
         print("in add Model in ShowBase")
         model = self.loader.loadModel(fileName)
         model.setPos(0, 0, 0)
-        model.setScale(2,2,2)
+        model.setScale(1,1,1)
         model.reparentTo(self.scene)
         modelObj = Model(fileName, model)
         Model.allModels.append(modelObj)
