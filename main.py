@@ -18,8 +18,8 @@ from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
 #Python Module imports
-from math import pi, sin, cos, sqrt
 from functools import partial
+import random
 import sys
 
 #Constants
@@ -31,7 +31,8 @@ class Model(object):
     allModels = list()
     switcher = {
         1: "Wall",
-        2: "Pole"
+        2: "Pole",
+        3: "MainBody"
     }
 
     def __init__(self, path, model):
@@ -60,10 +61,6 @@ class Model(object):
 
     # Add Label-Specific UI
     def addLabelUI(self, dummy, layout, index):
-        print("yay!")
-        print(index)
-        print(layout)
-        print(dummy)
         if Model.switcher.get(index) == "Wall":  # If it is wall
             widthLabel = QLabel("Width")
             width = QSlider(Qt.Horizontal)
@@ -95,6 +92,7 @@ class Model(object):
         #Get Components from the user input
         wall = [m for m in Model.allModels if m.label == "Wall"][0]
         tower = [m for m in Model.allModels if m.label == "Pole"][0]
+        mainBody = [m for m in Model.allModels if m.label == "MainBody"][0]
 
         #print(wall.model.getTightBounds())
         bounds = wall.model.getTightBounds()
@@ -128,19 +126,46 @@ class Model(object):
             currentY += (maxX - minX)
             wall.model.instanceTo(wallInstance)
             wall.model.instanceTo(wallInstanceMirror)
+        #Hide Wall Model
+        wall.model.detachNode()
 
         #Generate Towers
         towers = scene.attachNewNode("Towers")
         towers.setPos(0,0,0)
         wallBounds = walls.getTightBounds()
         wallLocations = [(wallBounds[0][0], wallBounds[0][1]),
-                         (wallBounds[1][0], wallBounds[0][1]),
-                         (wallBounds[1][0], wallBounds[1][1]),
-                         (wallBounds[0][0], wallBounds[1][1])]
+                 (wallBounds[1][0], wallBounds[0][1]),
+                 (wallBounds[1][0], wallBounds[1][1]),
+                 (wallBounds[0][0], wallBounds[1][1])]
         for location in wallLocations:
             towerInstance = towers.attachNewNode("tower-instance")
             towerInstance.setPos(location[0], location[1], 0)
             tower.model.instanceTo(towerInstance)
+        #Hide Tower Model
+        tower.model.detachNode()
+
+        #Generate MainBody
+        bodies = scene.attachNewNode("Bodies")
+        bodies.setPos(0,0,0)
+        bodyBound = mainBody.model.getTightBounds()
+        dx = bodyBound[1][0] - bodyBound[0][0]
+        dy = bodyBound[1][1] - bodyBound[0][1]
+        wallXmin = wallBounds[0][0]
+        wallYmin = wallBounds[0][1]
+        wallXmax = wallBounds[1][0]
+        wallYmax = wallBounds[1][1]
+        wallDx = wallXmax - wallXmin
+        wallDy = wallYmax - wallYmin
+        N = int(wallDx * wallDy / (dx * dy))
+        for i in range(N):
+            randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
+            randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
+            mainBodyInstance = bodies.attachNewNode("mainbody-instance")
+            mainBodyInstance.setPos(randX, randY, 0)
+            mainBody.model.instanceTo(mainBodyInstance)
+        #Hide MainBody Model
+        mainBody.model.detachNode()
+
 
 
 
@@ -204,7 +229,7 @@ class QTWindow(QWidget):
         vbox = QVBoxLayout()
         isWall = QComboBox()
         vbox.addWidget(isWall)
-        isWall.addItems(["----", "Wall", "Pole"])
+        isWall.addItems(["----", "Wall", "Pole", "Main Body"])
         isWall.currentIndexChanged.connect(partial(model.changeLabel,
                                                    isWall.currentIndex()))
         isWall.currentIndexChanged.connect(partial(model.addLabelUI,
@@ -263,8 +288,8 @@ class World(ShowBase):
         self.window = None
 
         #Events
-        self.accept("wheel_up", self.zoom, [1])
-        self.accept("wheel_down", self.zoom, [-1])
+        self.accept("wheel_up", self.zoom, [0.1])
+        self.accept("wheel_down", self.zoom, [-0.1])
         self.accept("q-repeat", self.rotate, [1])
         self.accept("e-repeat", self.rotate, [-1])
         self.accept("w-repeat", self.move, ["up"])
@@ -275,8 +300,9 @@ class World(ShowBase):
 
     #Set the initial camera position
     def setCameraTask(self, task):
-        self.camera.setPos(50, -50, 90)
-        self.camera.setHpr(45, -50, 0)
+        self.camera.setPos(0, -200, 220)
+        self.camera.setHpr(0, -50, 0)
+        self.camLens.setFocalLength(0.1)
         return Task.done
 
 
@@ -304,7 +330,7 @@ class World(ShowBase):
     #Method to handle zoom event
     def zoom(self, dir):
         distance = base.camLens.getFocalLength()
-        if distance + dir > 0:
+        if distance + dir > 0.1:
             base.camLens.setFocalLength(distance + dir)
 
     #Method to rotate the scene
