@@ -1,11 +1,13 @@
 ###15-112 Term Project####
 ###Author: Qianye(Renee) Mei
 
+##PySide2 5.11.2 and Panda3D 1.10.0 Required for running
 '''
 The code skeleton is modified from dinoint's code from
 https://discourse.panda3d.org/t/using-panda3d-with-pyqt-or-pygtk-
 possible/6170
 '''
+
 #PySide2 imports
 from PySide2.QtWidgets import *
 from PySide2.QtCore import *
@@ -19,154 +21,14 @@ loadPrcFileData("", "window-type none")
 
 #Python Module imports
 from functools import partial
-import random
 import sys
+
+#Other Module in the project
+from model import Model
 
 #Constants
 P3D_WIN_WIDTH = 400
 P3D_WIN_HEIGHT = 240
-
-class Model(object):
-    #Class attribute holding all models
-    allModels = list()
-    switcher = {
-        1: "Wall",
-        2: "Pole",
-        3: "MainBody"
-    }
-
-    def __init__(self, path, model):
-        self.path = path
-        self.model = model
-        self.label = "Wall"
-        #Assign a default material
-        self.model.setColor((1,0,0,1))
-        self.material = Material()
-        self.material.setDiffuse((1,0,0,1))
-        self.model.setMaterial(self.material)
-        self.model.setShaderAuto()
-        self.width = 0
-        self.height = 0
-
-    def __repr__(self):
-        return "Model at " + self.path
-
-    def changeMaterialColor(self, color):
-        self.material.setAmbient(color)
-        self.model.setMaterial(self.material)
-
-    def changeLabel(self, dummy, index):
-
-        self.label = Model.switcher.get(index)
-
-    # Add Label-Specific UI
-    def addLabelUI(self, dummy, layout, index):
-        if Model.switcher.get(index) == "Wall":  # If it is wall
-            widthLabel = QLabel("Width")
-            width = QSlider(Qt.Horizontal)
-            heightLabel = QLabel("Length")
-            height = QSlider(Qt.Horizontal)
-            width.setMinimum(1)
-            width.setMaximum(10)
-            width.valueChanged.connect(
-                partial(self.changeWValue, width.value()))
-            height.setMinimum(1)
-            height.setMaximum(10)
-            height.valueChanged.connect(
-                partial(self.changeHValue, height.value()))
-            layout.addWidget(widthLabel)
-            layout.addWidget(width)
-            layout.addWidget(heightLabel)
-            layout.addWidget(height)
-        self.changeLabel(dummy, index)
-
-    def changeWValue(self, state, w):
-        self.width = round(w)
-
-    def changeHValue(self, state, h):
-        self.height = round(h)
-
-
-    @staticmethod
-    def generate(scene):
-        #Get Components from the user input
-        wall = [m for m in Model.allModels if m.label == "Wall"][0]
-        tower = [m for m in Model.allModels if m.label == "Pole"][0]
-        mainBody = [m for m in Model.allModels if m.label == "MainBody"][0]
-
-        #print(wall.model.getTightBounds())
-        bounds = wall.model.getTightBounds()
-        minX = bounds[0][0]
-        maxX, maxY, maxZ = bounds[1][0], bounds[1][1], bounds[1][2]
-        currentX = - (maxX - minX) * wall.width / 2
-        currentY = - (maxX - minX) / 2 - (maxX - minX) * wall.height / 2
-        walls = scene.attachNewNode("Walls")
-        walls.setPos(0,0,0)
-
-        #Generate walls on the width side
-        for i in range(wall.width):
-            wallInstance = walls.attachNewNode("wall-instance")
-            wallInstanceMirror = walls.attachNewNode("wall-instance-mirror")
-            wallInstance.setPos(walls, currentX + maxX - minX, currentY + (maxX- minX) / 2, 0)
-            wallInstanceMirror.setPos(walls, currentX + maxX - minX, currentY + (maxX- minX) / 2 + (maxX - minX) * wall.height, 0)
-            currentX += (maxX - minX)
-            wall.model.instanceTo(wallInstance)
-            wall.model.instanceTo(wallInstanceMirror)
-
-        currentX = - (maxX - minX) * wall.width / 2
-        #Generate walls on the length side
-        for i in range(wall.height):
-            wallInstance = walls.attachNewNode("wall-instance")
-            wallInstanceMirror = walls.attachNewNode("wall-instance-mirror")
-            wallInstance.setHpr(90, 0, 0)
-            wallInstance.setPos(walls, currentX + (maxX- minX) / 2, currentY + maxX - minX, 0)
-            wallInstanceMirror.setPos(walls, currentX + (maxX- minX) / 2 + (maxX - minX) * wall.width,
-                                      currentY + maxX - minX, 0)
-            wallInstanceMirror.setHpr(90, 0, 0)
-            currentY += (maxX - minX)
-            wall.model.instanceTo(wallInstance)
-            wall.model.instanceTo(wallInstanceMirror)
-        #Hide Wall Model
-        wall.model.detachNode()
-
-        #Generate Towers
-        towers = scene.attachNewNode("Towers")
-        towers.setPos(0,0,0)
-        wallBounds = walls.getTightBounds()
-        wallLocations = [(wallBounds[0][0], wallBounds[0][1]),
-                 (wallBounds[1][0], wallBounds[0][1]),
-                 (wallBounds[1][0], wallBounds[1][1]),
-                 (wallBounds[0][0], wallBounds[1][1])]
-        for location in wallLocations:
-            towerInstance = towers.attachNewNode("tower-instance")
-            towerInstance.setPos(location[0], location[1], 0)
-            tower.model.instanceTo(towerInstance)
-        #Hide Tower Model
-        tower.model.detachNode()
-
-        #Generate MainBody
-        bodies = scene.attachNewNode("Bodies")
-        bodies.setPos(0,0,0)
-        bodyBound = mainBody.model.getTightBounds()
-        dx = bodyBound[1][0] - bodyBound[0][0]
-        dy = bodyBound[1][1] - bodyBound[0][1]
-        wallXmin = wallBounds[0][0]
-        wallYmin = wallBounds[0][1]
-        wallXmax = wallBounds[1][0]
-        wallYmax = wallBounds[1][1]
-        wallDx = wallXmax - wallXmin
-        wallDy = wallYmax - wallYmin
-        N = int(wallDx * wallDy / (dx * dy))
-        for i in range(N):
-            randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
-            randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
-            mainBodyInstance = bodies.attachNewNode("mainbody-instance")
-            mainBodyInstance.setPos(randX, randY, 0)
-            mainBody.model.instanceTo(mainBodyInstance)
-        #Hide MainBody Model
-        mainBody.model.detachNode()
-
-
 
 
 #The Main Program Window (GUI)
@@ -193,6 +55,7 @@ class QTWindow(QWidget):
         self.menulayout.addWidget(self.modelLst)
         self.sideMenu.setLayout(self.menulayout)
 
+        #Generate the Layout of the main panel
         layout = QGridLayout()
         layout.addWidget(self.pandaContainer, 0, 0)
         layout.addWidget(self.sideMenu, 0, 1, 1)
@@ -201,6 +64,7 @@ class QTWindow(QWidget):
 
         self.setLayout(layout)
 
+    #Generate buttons on the pane
     def generateButtons(self):
         buttonWidget = QWidget()
         lyt = QVBoxLayout()
@@ -229,7 +93,7 @@ class QTWindow(QWidget):
         vbox = QVBoxLayout()
         isWall = QComboBox()
         vbox.addWidget(isWall)
-        isWall.addItems(["----", "Wall", "Pole", "Main Body"])
+        isWall.addItems(["----", "Wall", "Tower", "Main Body", "Roof", "Deco"])
         isWall.currentIndexChanged.connect(partial(model.changeLabel,
                                                    isWall.currentIndex()))
         isWall.currentIndexChanged.connect(partial(model.addLabelUI,
@@ -248,7 +112,6 @@ class QTWindow(QWidget):
             color = picker.selectedColor().getRgbF()
             print(color)
             m.model.setColor(color)
-
 
 
 
@@ -305,7 +168,11 @@ class World(ShowBase):
         self.camLens.setFocalLength(0.1)
         return Task.done
 
+    def animatedGeneration(self):
+        pass
 
+
+    #Bind Panda3D window to QtWindow
     def bindToWindow(self, windowHandle):
         wp = WindowProperties().getDefault()
         wp.setOrigin(0, 0)
@@ -314,6 +181,7 @@ class World(ShowBase):
         self.wp = wp
         base.openDefaultWindow(props=wp)
 
+    #Add Model to the Panda3D scene and call function to add UI
     def addModel(self, fileName):
         print("in add Model in ShowBase")
         model = self.loader.loadModel(fileName)
@@ -323,9 +191,6 @@ class World(ShowBase):
         modelObj = Model(fileName, model)
         Model.allModels.append(modelObj)
         self.window.addModelUI(modelObj)
-
-    def fn(self, dir, num):
-        print("Keyboard Input!")
 
     #Method to handle zoom event
     def zoom(self, dir):
