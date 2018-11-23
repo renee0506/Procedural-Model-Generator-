@@ -5,14 +5,14 @@ from PySide2.QtCore import *
 #Panda3D imports
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
-from panda3d.core import Point3, WindowProperties, Material
+from panda3d.core import Point3, WindowProperties, Material, NodePath
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
 #Python Module imports
 from functools import partial
 import random, math
-import sys
+import threading, time
 
 class Model(object):
     #Class attribute holding all models
@@ -79,7 +79,7 @@ class Model(object):
 
 
     @staticmethod
-    def generate(scene):
+    def generate(scene, animated=False):
         typeToInstances = dict()
         #Get Components from the user input
         wall = [m for m in Model.allModels if m.label == "Wall"][0]
@@ -94,7 +94,8 @@ class Model(object):
         currentX = - (maxX - minX) * wall.width / 2
         currentY = - (maxX - minX) / 2 - (maxX - minX) * wall.height / 2
         #parent node of all wall objects
-        walls = scene.attachNewNode("Walls")
+        dummy = NodePath("test")
+        walls = dummy.attachNewNode("Walls")
         walls.setPos(0,0,0)
 
         #Generate walls on the width side
@@ -135,7 +136,7 @@ class Model(object):
         wall.model.detachNode()
 
         #Generate Towers
-        towers = scene.attachNewNode("Towers")
+        towers = dummy.attachNewNode("Towers")
         towers.setPos(0,0,0)
         wallBounds = walls.getTightBounds()
         wallLocations = [(wallBounds[0][0], wallBounds[0][1]),
@@ -155,7 +156,7 @@ class Model(object):
         tower.model.detachNode()
 
         #Generate MainBody
-        bodies = scene.attachNewNode("Bodies")
+        bodies = dummy.attachNewNode("Bodies")
         bodies.setPos(0,0,0)
         bodyBound = mainBody.model.getTightBounds()
         dx = bodyBound[1][0] - bodyBound[0][0]
@@ -221,7 +222,7 @@ class Model(object):
         #Hide MainBody Model
         mainBody.model.detachNode()
 
-        roofs = scene.attachNewNode("Bodies")
+        roofs = dummy.attachNewNode("Bodies")
         roofs.setPos(0, 0, 0)
         #Generate Roof
         for center in upperCenters:
@@ -236,7 +237,7 @@ class Model(object):
 
         #Generate Windows on vertical surfaces
         numberOfSurfaces = len(surfaces)
-        vDecos = scene.attachNewNode("vDecos")
+        vDecos = dummy.attachNewNode("vDecos")
         vDecos.setPos(0, 0, 0)
 
         for i in range(20):
@@ -257,8 +258,11 @@ class Model(object):
             vDecoInstancies.append(vDecoInstance)
             typeToInstances["Deco"] = vDecoInstancies
         deco.model.detachNode()
-
-
+        castle = Castle(typeToInstances, dummy, scene)
+        if not animated:
+            castle.instantiate()
+        elif animated:
+            castle.animatedInstantiate()
 
 #An instance of a model
 class Instance(object):
@@ -269,11 +273,11 @@ class Instance(object):
         self.location = location
         self.rotation = rotation
         self.scale = scale
-        self.scene = parent
+        self.parent = parent
         self.node = None
 
     def instantiate(self):
-        instance = self.scene.attachNewNode("newInstance")
+        instance = self.parent.attachNewNode("newInstance")
         self.model.instanceTo(instance)
         instance.setPos(self.location)
         instance.setScale(self.scale)
@@ -291,12 +295,29 @@ class Instance(object):
 #The data of the entire castle
 class Castle(object):
 
-    def __init__(self, dict):
-        self.typeToInfo = dict()
+    def __init__(self, dict, root, scene):
+        self.typeToInstances = dict
+        self.root = root
+        print("Contruscting self.scene:", scene)
+        self.scene = scene
 
     #Instances a castle to the panda3D program
     def instantiate(self):
-        pass
+        print(type(self.scene))
+        self.root.reparentTo(self.scene)
+
+    def animate(self):
+        nodes = self.root.getChildren()
+        for node in nodes:
+            children = node.getChildren()
+            for child in children:
+                child.reparentTo(self.scene)
+                time.sleep(1.0)
+
+    #Method to generate animated process of building the structure
+    def animatedInstantiate(self):
+        threading.Thread(target=self.animate).start()
+        print("in animated Instantiate")
 
     #Saves the data to the documents
     def saveCastleInfo(self):

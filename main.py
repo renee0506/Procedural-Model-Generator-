@@ -73,7 +73,10 @@ class QTWindow(QWidget):
         lyt.addWidget(addModelButton)
         generateButton = QPushButton("Generate")
         generateButton.clicked.connect(partial(Model.generate, self.program.scene))
+        agButton = QPushButton("Animated Generate")
+        agButton.clicked.connect(partial(Model.generate, self.program.scene, True))
         lyt.addWidget(generateButton)
+        lyt.addWidget(agButton)
         buttonWidget.setLayout(lyt)
         self.menulayout.addWidget(buttonWidget)
 
@@ -145,6 +148,7 @@ class World(ShowBase):
         # Apply scale and position transforms on the model.
         self.scene.setScale(5, 5, 5)
         self.scene.setPos(0, 0, 0)
+        self.castle = None
         self.taskMgr.add(self.setCameraTask, "SetCameraTask")
 
         #Refering to the front-end
@@ -214,6 +218,9 @@ class World(ShowBase):
             self.camera.setPos(pos[0] - 1, pos[1], pos[2])
         else:
             self.camera.setPos(pos[0] + 1, pos[1], pos[2])
+
+
+
 
 
 if __name__ == '__main__':
