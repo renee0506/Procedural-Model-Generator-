@@ -25,7 +25,7 @@ class Model(object):
         5: "Deco"
     }
 
-    def __init__(self, path, model):
+    def __init__(self, path, model, parent):
         self.path = path
         self.model = model
         self.label = "Wall"
@@ -37,6 +37,11 @@ class Model(object):
         self.model.setShaderAuto()
         self.width = 0
         self.height = 0
+        self.scale = (1,1,1)
+        self.nOfSections = 20
+        self.randomness = 2
+        self.parent = parent
+        self.showParams = True
 
     def __repr__(self):
         return "Model at " + self.path
@@ -46,11 +51,20 @@ class Model(object):
         self.model.setMaterial(self.material)
 
     def changeLabel(self, dummy, index):
-
         self.label = Model.switcher.get(index)
 
     # Add Label-Specific UI
     def addLabelUI(self, dummy, layout, index):
+        self.clearLayout(layout)
+        scale = QSlider(Qt.Horizontal)
+        scaleLabel = QLabel("Scale")
+        scale.setMinimum(1)
+        scale.setMaximum(10)
+        scale.valueChanged.connect(
+            partial(self.changeScale, scale.value())
+        )
+        layout.addWidget(scaleLabel)
+        layout.addWidget(scale)
         if Model.switcher.get(index) == "Wall":  # If it is wall
             widthLabel = QLabel("Width")
             width = QSlider(Qt.Horizontal)
@@ -64,22 +78,97 @@ class Model(object):
             height.setMaximum(10)
             height.valueChanged.connect(
                 partial(self.changeHValue, height.value()))
+
             layout.addWidget(widthLabel)
             layout.addWidget(width)
             layout.addWidget(heightLabel)
             layout.addWidget(height)
+        elif Model.switcher.get(index) == "Pole": # If it is Pole
+            #TODO: WRITE THE BACKEND PART OF THIS CODE
+            heightLabel = QLabel("height")
+            height = QSlider(Qt.Horizontal)
+            height.setMinimum(1)
+            height.setMaximum(10)
+            height.valueChanged.connect(
+                partial(self.changeHValue, height.value())
+            )
+            layout.addWidget(heightLabel)
+            layout.addWidget(height)
+        elif Model.switcher.get(index) == "MainBody":
+            nOfSecLabel = QLabel("number of sections")
+            nOfSec = QSlider(Qt.Horizontal)
+            nOfSec.setMinimum(1)
+            nOfSec.setMaximum(20)
+            nOfSec.valueChanged.connect(
+                partial(self.changeNofSections, nOfSec.value())
+            )
+            randomnessLebel = QLabel("Randomness")
+            randomness = QSlider(Qt.Horizontal)
+            randomness.setMinimum(1)
+            randomness.setMaximum(10)
+            randomness.valueChanged.connect(
+                partial(self.changeRandomness, nOfSec.value())
+            )
+            layout.addWidget(nOfSecLabel)
+            layout.addWidget(nOfSec)
+        elif Model.switcher.get(index) == "Roof":
+            heightLabel = QLabel("height")
+            height = QSlider(Qt.Horizontal)
+            height.setMinimum(1)
+            height.setMaximum(10)
+            height.valueChanged.connect(
+                partial(self.changeHValue, height.value())
+            )
+            layout.addWidget(heightLabel)
+            layout.addWidget(height)
+
         self.changeLabel(dummy, index)
+
+
+    #Cited From: https://stackoverflow.com/questions/4528347/clear-all
+    # -widgets-in-a-layout-in-pyqt
+    def clearLayout(self, layout):
+        while layout.count():
+            child = layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
 
     #Read the New Width Value
     def changeWValue(self, state, w):
         self.width = round(w)
+        Model.generate(self.parent)
+
     #Read the New Length Value
     def changeHValue(self, state, h):
         self.height = round(h)
+        Model.generate(self.parent)
+
+    #Change the scale of the model
+    def changeScale(self, state, s):
+        num = round(s)
+        self.scale = (num, num, num)
+        Model.generate(self.parent)
+
+    # For mainBody Only, change the number of sections of the body
+    def changeNofSections(self, state, sec):
+        self.sections = sec
+        Model.generate(self.parent)
+
+    # For mainBody, change the randomness of height
+    def changeRandomness(self, state, rand):
+        self.randomness = rand
+        Model.generate(self.randomness)
 
 
     @staticmethod
     def generate(scene, animated=False):
+        node = scene.find("test")
+        print(node)
+        try:
+            node.detachNode()
+        except:
+            print("A generation result does not exist yet")
+
         typeToInstances = dict()
         #Get Components from the user input
         wall = [m for m in Model.allModels if m.label == "Wall"][0]
@@ -104,8 +193,8 @@ class Model(object):
             posMirror = (currentX + maxX - minX,
                          currentY + (maxX- minX) / 2 +
                          (maxX - minX) * wall.height, 0)
-            wallInstance = Instance(wall.model, walls, pos)
-            wallInstanceMirror = Instance(wall.model, walls, posMirror)
+            wallInstance = Instance(wall.model, walls, pos, scale = wall.scale)
+            wallInstanceMirror = Instance(wall.model, walls, posMirror, scale = wall.scale)
             currentX += (maxX - minX)
             wallInstance.instantiate()
             wallInstanceMirror.instantiate()
@@ -122,8 +211,8 @@ class Model(object):
             posMirror = (currentX + (maxX- minX) / 2 +
                          (maxX - minX) * wall.width,
                         currentY + maxX - minX, 0)
-            wallInstance = Instance(wall.model, walls, pos, hpr)
-            wallInstanceMirror = Instance(wall.model, walls, posMirror, hpr)
+            wallInstance = Instance(wall.model, walls, pos, hpr, scale = wall.scale)
+            wallInstanceMirror = Instance(wall.model, walls, posMirror, hpr, scale = wall.scale)
             currentY += (maxX - minX)
             wallInstance.instantiate()
             wallInstanceMirror.instantiate()
@@ -145,7 +234,7 @@ class Model(object):
                          (wallBounds[0][0], wallBounds[1][1])]
         for location in wallLocations:
             pos = (location[0], location[1], 0)
-            towerInstance = Instance(tower.model, towers, pos)
+            towerInstance = Instance(tower.model, towers, pos, scale = tower.scale)
             towerInstance.instantiate()
             towerInstancies = typeToInstances.get("Towers",
                                         list())
@@ -175,9 +264,9 @@ class Model(object):
         for i in range(N):
             randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
             randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
-            randZ = random.uniform(1, 2)
+            randZ = random.uniform(1, mainBody.randomness)
             pos = (randX, randY, 0)
-            scale = (1, 1, randZ)
+            scale = (mainBody.scale[0], mainBody.scale[1], mainBody.scale[2] * randZ)
             mainBodyInstance = Instance(mainBody.model, bodies, pos, scale=scale)
             mainBodyInstance.instantiate()
             mainBodyInstancies = typeToInstances.get("Main Body", list())
@@ -227,7 +316,7 @@ class Model(object):
         #Generate Roof
         for center in upperCenters:
             pos = (center[0], center[1], center[2])
-            roofInstance = Instance(roof.model, roofs, pos)
+            roofInstance = Instance(roof.model, roofs, pos, scale = roof.scale)
             roofInstance.instantiate()
             roofInstancies = typeToInstances.get("Roof", list())
             roofInstancies.append(roofInstance)
@@ -250,9 +339,9 @@ class Model(object):
             pos = (randx, randy, randz)
             if math.isclose(randx, surface[1][0]):
                 vDecoInstance = Instance(deco.model, vDecos, pos,
-                                         rotation = (0, 0, 90))
+                                         rotation = (0, 0, 90), scale = deco.scale)
             else:
-                vDecoInstance = Instance(deco.model, vDecos, pos)
+                vDecoInstance = Instance(deco.model, vDecos, pos, scale = deco.scale)
             vDecoInstance.instantiate()
             vDecoInstancies = typeToInstances.get("Deco", list())
             vDecoInstancies.append(vDecoInstance)
@@ -267,6 +356,7 @@ class Model(object):
 #An instance of a model
 class Instance(object):
 
+    #Init an instance of a model
     def __init__(self, model, parent, location, rotation = (0,0,0),
                  scale = (1,1,1)):
         self.model = model
@@ -276,6 +366,7 @@ class Instance(object):
         self.parent = parent
         self.node = None
 
+    #Instantiate the model to this instance
     def instantiate(self):
         instance = self.parent.attachNewNode("newInstance")
         self.model.instanceTo(instance)
@@ -284,6 +375,7 @@ class Instance(object):
         instance.setHpr(self.rotation)
         self.node = instance
 
+    #Get the Tight Bounds of this instance
     def getTightBounds(self):
         if self.node is None:
             print("Object has not been instantiated yet!")
@@ -298,7 +390,6 @@ class Castle(object):
     def __init__(self, dict, root, scene):
         self.typeToInstances = dict
         self.root = root
-        print("Contruscting self.scene:", scene)
         self.scene = scene
 
     #Instances a castle to the panda3D program
@@ -319,9 +410,25 @@ class Castle(object):
         threading.Thread(target=self.animate).start()
         print("in animated Instantiate")
 
+    #Formate the information for output
+    def format(self):
+        keysRes = ""
+        for key in self.typeToInstances:
+            keysRes += key + "|"
+        keysRes = keysRes[:-1] + "\n"
+        for key in self.typeToInstances:
+            keysRes += self.typeToInstances[key] + "|"
+        keysRes = keysRes[:-1]
+        return keysRes
+
     #Saves the data to the documents
     def saveCastleInfo(self):
-        pass
+        localtime = time.localtime(time.time())
+        f = open("Saves/save" + localtime + ".txt", "r+")
+        f.write(self.format())
+        f.close()
+
+
 
 
 

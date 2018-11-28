@@ -15,7 +15,8 @@ from PySide2.QtCore import *
 #Panda3D imports
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
-from panda3d.core import Point3, WindowProperties, Material
+from panda3d.core import Point3, WindowProperties, Material, \
+                            GraphicsWindow, Filename
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
@@ -53,6 +54,10 @@ class QTWindow(QWidget):
         self.modelLstLayout = QVBoxLayout()
         self.modelLst.setLayout(self.modelLstLayout)
         self.menulayout.addWidget(self.modelLst)
+        self.modelLst2 = QWidget()
+        self.modelLstLayout2 = QVBoxLayout()
+        self.modelLst2.setLayout(self.modelLstLayout2)
+        self.menulayout.addWidget(self.modelLst2)
         self.sideMenu.setLayout(self.menulayout)
 
         #Generate the Layout of the main panel
@@ -77,6 +82,9 @@ class QTWindow(QWidget):
         agButton.clicked.connect(partial(Model.generate, self.program.scene, True))
         lyt.addWidget(generateButton)
         lyt.addWidget(agButton)
+        saveShotButton = QPushButton("Save A Screenshot")
+        saveShotButton.clicked.connect(partial(self.program.saveShot))
+        lyt.addWidget(saveShotButton)
         buttonWidget.setLayout(lyt)
         self.menulayout.addWidget(buttonWidget)
 
@@ -93,20 +101,33 @@ class QTWindow(QWidget):
     #Renew the List of Models on GUI
     def addModelUI(self, model):
         groupBox = QGroupBox(model.path.split("/")[-1])
+        #groupBox.setFixedHeight(200)
         vbox = QVBoxLayout()
         isWall = QComboBox()
         vbox.addWidget(isWall)
+        selectColor = QPushButton("Select Color")
+        selectColor.clicked.connect(partial(self.changeColor, model))
+        vbox.addWidget(selectColor)
+        options = QWidget()
+        vbox.addWidget(options)
+        optionLayout = QVBoxLayout()
+        optionLayout.setContentsMargins(0,0,0,0)
+        options.setLayout(optionLayout)
         isWall.addItems(["----", "Wall", "Tower", "Main Body", "Roof", "Deco"])
         isWall.currentIndexChanged.connect(partial(model.changeLabel,
                                                    isWall.currentIndex()))
         isWall.currentIndexChanged.connect(partial(model.addLabelUI,
                                                    isWall.currentIndex(),
-                                                   vbox))
-        selectColor = QPushButton("Select Color")
-        selectColor.clicked.connect(partial(self.changeColor, model))
-        vbox.addWidget(selectColor)
+                                                   optionLayout))
+        # collapse = QPushButton("Collapse")
+        # collapse.clicked.connect(partial(self.toggle, options))
+        # vbox.addWidget(collapse)
         groupBox.setLayout(vbox)
-        self.modelLstLayout.addWidget(groupBox)
+        if len(Model.allModels) < 4:
+            self.modelLstLayout.addWidget(groupBox)
+        else:
+            self.modelLstLayout2.addWidget(groupBox)
+
 
     #Popout the UI element for changing color
     def changeColor(self, m):
@@ -115,6 +136,12 @@ class QTWindow(QWidget):
             color = picker.selectedColor().getRgbF()
             print(color)
             m.model.setColor(color)
+
+    # def toggle(self, widget):
+    #     if widget.height() != 0:
+    #         widget.parentWidget().setFixedHeight(0)
+    #     else:
+    #         widget.setFixedHeight(100)
 
 
 
@@ -163,6 +190,7 @@ class World(ShowBase):
         self.accept("s-repeat", self.move, ["down"])
         self.accept("a-repeat", self.move, ["left"])
         self.accept("d-repeat", self.move, ["right"])
+        self.accept("s", self.save)
 
 
     #Set the initial camera position
@@ -192,7 +220,7 @@ class World(ShowBase):
         model.setPos(0, 0, 0)
         model.setScale(1,1,1)
         model.reparentTo(self.scene)
-        modelObj = Model(fileName, model)
+        modelObj = Model(fileName, model, self.scene)
         Model.allModels.append(modelObj)
         self.window.addModelUI(modelObj)
 
@@ -219,8 +247,11 @@ class World(ShowBase):
         else:
             self.camera.setPos(pos[0] + 1, pos[1], pos[2])
 
+    def save(self):
+        self.castle.saveCastleInfo()
 
-
+    def saveShot(self):
+        base.win.saveScreenshot(Filename("Screenshots/screenshot.bmp"))
 
 
 if __name__ == '__main__':
