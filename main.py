@@ -83,8 +83,11 @@ class QTWindow(QWidget):
         saveShotButton.clicked.connect(partial(self.program.saveShot))
         saveDataButton = QPushButton("Save this result")
         saveDataButton.clicked.connect(partial(self.program.save))
+        loadDataButton = QPushButton("Load result")
+        loadDataButton.clicked.connect(partial(self.program.load))
         lyt.addWidget(saveShotButton)
         lyt.addWidget(saveDataButton)
+        lyt.addWidget(loadDataButton)
         buttonWidget.setLayout(lyt)
         self.menulayout.addWidget(buttonWidget)
 
@@ -248,11 +251,22 @@ class World(ShowBase):
         else:
             self.camera.setPos(pos[0] + 1, pos[1], pos[2])
 
+    #The method to save data to local
     def save(self):
         if self.castle is None:
             print("No Castle has been generated yet!")
         else:
             self.castle.saveCastleInfo()
+
+    def load(self):
+        dialog = QFileDialog(None)
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        if dialog.exec_():
+            fileName = dialog.selectedFiles()[0]
+            f = open(fileName, "r+")
+            content = f.read()
+            f.close()
+            self.castle.load(content)
 
     def saveShot(self):
         base.win.saveScreenshot(Filename("screenshot.bmp"))
