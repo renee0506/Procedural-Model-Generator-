@@ -3,8 +3,6 @@ from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 
 #Panda3D imports
-from direct.showbase.ShowBase import ShowBase
-from direct.task import Task
 from panda3d.core import Point3, WindowProperties, Material, NodePath
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
@@ -13,6 +11,7 @@ loadPrcFileData("", "window-type none")
 from functools import partial
 import random, math
 import threading, time
+import json
 
 class Model(object):
     #Class attribute holding all models
@@ -21,9 +20,9 @@ class Model(object):
         1: "Wall",
         2: "Pole",
         3: "MainBody",
-        4: "Roof",
-        5: "Deco"
+        4: "Roof"
     }
+    showBase = None
 
     def __init__(self, path, model, parent):
         self.path = path
@@ -32,22 +31,25 @@ class Model(object):
         #Assign a default material
         self.model.setColor((1,0,0,1))
         self.material = Material()
-        self.material.setDiffuse((1,0,0,1))
+        self.material.setShininess(0.0)
+        self.material.setAmbient((0.2,0,0,1))
+        self.material.setDiffuse((0.5,0,0,1))
         self.model.setMaterial(self.material)
         self.model.setShaderAuto()
-        self.width = 0
-        self.height = 0
+        self.width = 1
+        self.length = 1
+        self.height = 1
         self.scale = (1,1,1)
         self.nOfSections = 20
         self.randomness = 2
-        self.parent = parent
+        self.parent = parent.scene
         self.showParams = True
 
     def __repr__(self):
         return "Model at " + self.path
 
     def changeMaterialColor(self, color):
-        self.material.setAmbient(color)
+        self.material.setDiffuse(color)
         self.model.setMaterial(self.material)
 
     def changeLabel(self, dummy, index):
@@ -58,8 +60,8 @@ class Model(object):
         self.clearLayout(layout)
         scale = QSlider(Qt.Horizontal)
         scaleLabel = QLabel("Scale")
-        scale.setMinimum(1)
-        scale.setMaximum(10)
+        scale.setMinimum(10)
+        scale.setMaximum(50)
         scale.valueChanged.connect(
             partial(self.changeScale, scale.value())
         )
@@ -68,62 +70,63 @@ class Model(object):
         if Model.switcher.get(index) == "Wall":  # If it is wall
             widthLabel = QLabel("Width")
             width = QSlider(Qt.Horizontal)
-            heightLabel = QLabel("Length")
-            height = QSlider(Qt.Horizontal)
+            lengthLabel = QLabel("Length")
+            length = QSlider(Qt.Horizontal)
             width.setMinimum(1)
             width.setMaximum(10)
             width.valueChanged.connect(
                 partial(self.changeWValue, width.value()))
-            height.setMinimum(1)
-            height.setMaximum(10)
+            length.setMinimum(1)
+            length.setMaximum(10)
+            length.valueChanged.connect(
+                partial(self.changeLValue, length.value()))
+            heightLabel = QLabel("Height")
+            height = QSlider(Qt.Horizontal)
+            height.setMinimum(10)
+            height.setMaximum(100)
             height.valueChanged.connect(
-                partial(self.changeHValue, height.value()))
-
-            layout.addWidget(widthLabel)
-            layout.addWidget(width)
+                partial(self.changeHValue, height.value())
+            )
             layout.addWidget(heightLabel)
             layout.addWidget(height)
+            layout.addWidget(widthLabel)
+            layout.addWidget(width)
+            layout.addWidget(lengthLabel)
+            layout.addWidget(length)
         elif Model.switcher.get(index) == "Pole": # If it is Pole
             #TODO: WRITE THE BACKEND PART OF THIS CODE
-            heightLabel = QLabel("height")
+            heightLabel = QLabel("Height")
             height = QSlider(Qt.Horizontal)
-            height.setMinimum(1)
-            height.setMaximum(10)
+            height.setMinimum(10)
+            height.setMaximum(100)
             height.valueChanged.connect(
                 partial(self.changeHValue, height.value())
             )
             layout.addWidget(heightLabel)
             layout.addWidget(height)
         elif Model.switcher.get(index) == "MainBody":
-            nOfSecLabel = QLabel("number of sections")
-            nOfSec = QSlider(Qt.Horizontal)
-            nOfSec.setMinimum(1)
-            nOfSec.setMaximum(20)
-            nOfSec.valueChanged.connect(
-                partial(self.changeNofSections, nOfSec.value())
-            )
-            randomnessLebel = QLabel("Randomness")
-            randomness = QSlider(Qt.Horizontal)
-            randomness.setMinimum(1)
-            randomness.setMaximum(10)
-            randomness.valueChanged.connect(
-                partial(self.changeRandomness, nOfSec.value())
-            )
-            layout.addWidget(nOfSecLabel)
-            layout.addWidget(nOfSec)
-        elif Model.switcher.get(index) == "Roof":
-            heightLabel = QLabel("height")
+            heightLabel = QLabel("Height")
             height = QSlider(Qt.Horizontal)
-            height.setMinimum(1)
-            height.setMaximum(10)
+            height.setMinimum(10)
+            height.setMaximum(100)
             height.valueChanged.connect(
                 partial(self.changeHValue, height.value())
             )
             layout.addWidget(heightLabel)
             layout.addWidget(height)
+            randomnessLabel = QLabel("Height Randomness")
+            randomness = QSlider(Qt.Horizontal)
+            randomness.setMinimum(1)
+            randomness.setMaximum(10)
+            randomness.valueChanged.connect(
+                partial(self.changeRandomness, randomness.value())
+            )
+            layout.addWidget(randomnessLabel)
+            layout.addWidget(randomness)
+        elif Model.switcher.get(index) == "Roof":
+            pass
 
         self.changeLabel(dummy, index)
-
 
     #Cited From: https://stackoverflow.com/questions/4528347/clear-all
     # -widgets-in-a-layout-in-pyqt
@@ -138,15 +141,20 @@ class Model(object):
         self.width = round(w)
         Model.generate(self.parent)
 
+    # Read the New Width Value
+    def changeLValue(self, state, l):
+        self.length = round(l)
+        Model.generate(self.parent)
+
     #Read the New Length Value
     def changeHValue(self, state, h):
-        self.height = round(h)
+        self.height = h /10.0
         Model.generate(self.parent)
 
     #Change the scale of the model
     def changeScale(self, state, s):
-        num = round(s)
-        self.scale = (num, num, num)
+        s = s / 10.0
+        self.scale = (s, s, s)
         Model.generate(self.parent)
 
     # For mainBody Only, change the number of sections of the body
@@ -171,17 +179,20 @@ class Model(object):
 
         typeToInstances = dict()
         #Get Components from the user input
-        wall = [m for m in Model.allModels if m.label == "Wall"][0]
-        tower = [m for m in Model.allModels if m.label == "Pole"][0]
-        mainBody = [m for m in Model.allModels if m.label == "MainBody"][0]
-        roof = [m for m in Model.allModels if m.label == "Roof"][0]
-        deco = [m for m in Model.allModels if m.label == "Deco"][0]
+        try:
+            wall = [m for m in Model.allModels if m.label == "Wall"][0]
+            tower = [m for m in Model.allModels if m.label == "Pole"][0]
+            mainBody = [m for m in Model.allModels if m.label == "MainBody"][0]
+            roof = [m for m in Model.allModels if m.label == "Roof"][0]
+        except:
+            print("Please Add All Components to the Scene First!")
+            return
 
         bounds = wall.model.getTightBounds()
         minX = bounds[0][0]
         maxX = bounds[1][0]
-        currentX = - (maxX - minX) * wall.width / 2
-        currentY = - (maxX - minX) / 2 - (maxX - minX) * wall.height / 2
+        currentX = - (maxX - minX) * wall.scale[0] * wall.width / 2
+        currentY = - (maxX - minX) * wall.scale[0] / 2 - (maxX - minX) * wall.scale[0] * wall.length / 2
         #parent node of all wall objects
         dummy = NodePath("test")
         walls = dummy.attachNewNode("Walls")
@@ -189,13 +200,14 @@ class Model(object):
 
         #Generate walls on the width side
         for i in range(wall.width):
-            pos = (currentX + maxX - minX, currentY + (maxX- minX) / 2, 0)
-            posMirror = (currentX + maxX - minX,
-                         currentY + (maxX- minX) / 2 +
-                         (maxX - minX) * wall.height, 0)
-            wallInstance = Instance(wall.model, walls, pos, scale = wall.scale)
-            wallInstanceMirror = Instance(wall.model, walls, posMirror, scale = wall.scale)
-            currentX += (maxX - minX)
+            pos = (currentX + (maxX - minX) * wall.scale[0], currentY + (maxX- minX) * wall.scale[0] / 2, 0)
+            posMirror = (currentX + (maxX - minX) * wall.scale[0],
+                         currentY + (maxX- minX) * wall.scale[0] / 2 +
+                         (maxX - minX) * wall.scale[0] * wall.length, 0)
+            scale = (wall.scale[0], wall.scale[1], wall.scale[2] * wall.height)
+            wallInstance = Instance(wall.model, walls, pos, scale = scale)
+            wallInstanceMirror = Instance(wall.model, walls, posMirror, scale = scale)
+            currentX += (maxX - minX) * wall.scale[0]
             wallInstance.instantiate()
             wallInstanceMirror.instantiate()
             wallInstancies = typeToInstances.get("Walls", list())
@@ -203,17 +215,18 @@ class Model(object):
             wallInstancies.append(wallInstanceMirror)
             typeToInstances["Walls"] = wallInstancies
 
-        currentX = - (maxX - minX) * wall.width / 2
+        currentX = - (maxX - minX) * wall.scale[0] * wall.width / 2
         #Generate walls on the length side
-        for i in range(wall.height):
-            pos = (currentX + (maxX- minX) / 2, currentY + maxX - minX, 0)
+        for i in range(wall.length):
+            pos = (currentX + (maxX- minX) * wall.scale[0] / 2, currentY + (maxX - minX) * wall.scale[0], 0)
             hpr = (90,0,0)
-            posMirror = (currentX + (maxX- minX) / 2 +
-                         (maxX - minX) * wall.width,
-                        currentY + maxX - minX, 0)
-            wallInstance = Instance(wall.model, walls, pos, hpr, scale = wall.scale)
-            wallInstanceMirror = Instance(wall.model, walls, posMirror, hpr, scale = wall.scale)
-            currentY += (maxX - minX)
+            posMirror = (currentX + (maxX- minX) * wall.scale[0] / 2 +
+                         (maxX - minX) * wall.scale[0] * wall.width,
+                        currentY + (maxX - minX) * wall.scale[0], 0)
+            scale = (wall.scale[0], wall.scale[1], wall.scale[2] * wall.height)
+            wallInstance = Instance(wall.model, walls, pos, hpr, scale = scale)
+            wallInstanceMirror = Instance(wall.model, walls, posMirror, hpr, scale = scale)
+            currentY += (maxX - minX) * wall.scale[0]
             wallInstance.instantiate()
             wallInstanceMirror.instantiate()
             wallInstancies = typeToInstances.get("Walls", list())
@@ -234,7 +247,8 @@ class Model(object):
                          (wallBounds[0][0], wallBounds[1][1])]
         for location in wallLocations:
             pos = (location[0], location[1], 0)
-            towerInstance = Instance(tower.model, towers, pos, scale = tower.scale)
+            scale = (tower.scale[0], tower.scale[1], tower.scale[2] * tower.height)
+            towerInstance = Instance(tower.model, towers, pos, scale=scale)
             towerInstance.instantiate()
             towerInstancies = typeToInstances.get("Towers",
                                         list())
@@ -256,18 +270,16 @@ class Model(object):
         wallYmax = wallBounds[1][1]
         wallDx = wallXmax - wallXmin
         wallDy = wallYmax - wallYmin
-        N = int(wallDx * wallDy / (dx * dy))
-        upperCorners = list()
-        lowerCorners = list()
+        N = int(wallDx * wallDy / (dx * mainBody.scale[0] * dy * mainBody.scale[0]))
         upperCenters = list()
-        surfaces = list() #for generating surface deco
         for i in range(N):
             randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
             randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
             randZ = random.uniform(1, mainBody.randomness)
             pos = (randX, randY, 0)
-            scale = (mainBody.scale[0], mainBody.scale[1], mainBody.scale[2] * randZ)
-            mainBodyInstance = Instance(mainBody.model, bodies, pos, scale=scale)
+            scale = (mainBody.scale[0], mainBody.scale[1],
+                     mainBody.scale[2] * mainBody.height)
+            mainBodyInstance = Instance(mainBody.model, bodies, pos, scale = scale)
             mainBodyInstance.instantiate()
             mainBodyInstancies = typeToInstances.get("Main Body", list())
             mainBodyInstancies.append(mainBodyInstance)
@@ -278,33 +290,6 @@ class Model(object):
                                   bounds[0][2]
             max_x, max_y, max_z = bounds[1][0], bounds[1][1], \
                                   bounds[1][2]
-            """
-                    1 --------- 6
-                     | \       \
-                     |  \       \
-                   2 \   \ 4     \-------- 8
-                      \   -------- 5
-                       \  |       |
-                        \ |       |
-                        3 -------- 7
-                    """
-            point1 = (min_x, max_y, max_z)
-            point2 = (min_x, min_y, min_z)
-            point3 = (min_x, max_y, min_z)
-            point4 = (min_x, min_y, max_z)
-            point5 = (max_x, min_y, max_z)
-            point6 = (max_x, max_y, max_z)
-            point7 = (max_x, min_y, min_z)
-            point8 = (max_x, max_y, min_z)
-            fourSurfaces = [(point1, point2, point3, point4),
-                            (point4, point3, point7, point5),
-                            (point5, point7, point8, point6),
-                            (point1, point2, point8, point6)]
-            surfaces += fourSurfaces
-            upperCorners.append([(min_x, min_y, max_z), (min_x, max_y, max_z),
-                                 (max_x, min_y, max_z), (max_x, max_y, max_z)])
-            lowerCorners.append([(min_x, min_y, min_z), (min_x, max_y, min_z),
-                                 (max_x, min_y, min_z), (max_x, max_y, min_z)])
             upperCenters.append((min_x + (max_x - min_x) / 2,
                                  min_y + (max_y - min_y) / 2,
                                  max_z))
@@ -316,38 +301,17 @@ class Model(object):
         #Generate Roof
         for center in upperCenters:
             pos = (center[0], center[1], center[2])
-            roofInstance = Instance(roof.model, roofs, pos, scale = roof.scale)
+            scale = (roof.scale[0], roof.scale[1],
+                     roof.scale[2] * roof.height)
+            roofInstance = Instance(roof.model, roofs, pos, scale = scale)
             roofInstance.instantiate()
             roofInstancies = typeToInstances.get("Roof", list())
             roofInstancies.append(roofInstance)
             typeToInstances["Roof"] = roofInstancies
         #Hide the initial roof model
         roof.model.detachNode()
-
-        #Generate Windows on vertical surfaces
-        numberOfSurfaces = len(surfaces)
-        vDecos = dummy.attachNewNode("vDecos")
-        vDecos.setPos(0, 0, 0)
-
-        for i in range(20):
-            #TODO: Chage to User Input Later
-            rand = random.randint(0, numberOfSurfaces)
-            surface = surfaces[rand]
-            randx = random.uniform(surface[1][0], surface[2][0])
-            randy = random.uniform(surface[0][1], surface[1][1])
-            randz = random.uniform(surface[0][2], surface[1][2])
-            pos = (randx, randy, randz)
-            if math.isclose(randx, surface[1][0]):
-                vDecoInstance = Instance(deco.model, vDecos, pos,
-                                         rotation = (0, 0, 90), scale = deco.scale)
-            else:
-                vDecoInstance = Instance(deco.model, vDecos, pos, scale = deco.scale)
-            vDecoInstance.instantiate()
-            vDecoInstancies = typeToInstances.get("Deco", list())
-            vDecoInstancies.append(vDecoInstance)
-            typeToInstances["Deco"] = vDecoInstancies
-        deco.model.detachNode()
         castle = Castle(typeToInstances, dummy, scene)
+        Model.showBase.castle = castle
         if not animated:
             castle.instantiate()
         elif animated:
@@ -371,8 +335,8 @@ class Instance(object):
         instance = self.parent.attachNewNode("newInstance")
         self.model.instanceTo(instance)
         instance.setPos(self.location)
-        instance.setScale(self.scale)
         instance.setHpr(self.rotation)
+        instance.setScale(self.scale[0], self.scale[1], self.scale[2])
         self.node = instance
 
     #Get the Tight Bounds of this instance
@@ -394,16 +358,16 @@ class Castle(object):
 
     #Instances a castle to the panda3D program
     def instantiate(self):
-        print(type(self.scene))
         self.root.reparentTo(self.scene)
 
     def animate(self):
         nodes = self.root.getChildren()
+        test = self.scene.attachNewNode("test")
         for node in nodes:
             children = node.getChildren()
             for child in children:
-                child.reparentTo(self.scene)
-                time.sleep(1.0)
+                child.reparentTo(test)
+                time.sleep(0.2)
 
     #Method to generate animated process of building the structure
     def animatedInstantiate(self):
@@ -412,19 +376,26 @@ class Castle(object):
 
     #Formate the information for output
     def format(self):
-        keysRes = ""
+        lst = []
         for key in self.typeToInstances:
-            keysRes += key + "|"
-        keysRes = keysRes[:-1] + "\n"
-        for key in self.typeToInstances:
-            keysRes += self.typeToInstances[key] + "|"
-        keysRes = keysRes[:-1]
-        return keysRes
+            instances = self.typeToInstances[key]
+            x = {
+                "type": key,
+                "locations": [instance.location for instance in instances],
+                "scale": [instance.scale for instance in instances],
+                "rotation": [instance.rotation for instance in instances]
+            }
+            lst.append(x)
+
+        formated = json.dumps(lst)
+        return formated
 
     #Saves the data to the documents
     def saveCastleInfo(self):
         localtime = time.localtime(time.time())
-        f = open("Saves/save" + localtime + ".txt", "r+")
+        f = open("Saves/save" + str(localtime.tm_year) + ":" +
+                 str(localtime.tm_mon) + ":" + str(localtime.tm_hour) + ":" +
+                 str(localtime.tm_min) + ".txt", "w+")
         f.write(self.format())
         f.close()
 

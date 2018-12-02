@@ -16,7 +16,7 @@ from PySide2.QtCore import *
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Point3, WindowProperties, Material, \
-                            GraphicsWindow, Filename
+                            GraphicsWindow, Filename, DirectionalLight, VBase4
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
@@ -25,7 +25,7 @@ from functools import partial
 import sys
 
 #Other Module in the project
-from model import Model
+from model import Model, Castle
 
 #Constants
 P3D_WIN_WIDTH = 400
@@ -76,15 +76,15 @@ class QTWindow(QWidget):
         addModelButton = QPushButton("Add")
         addModelButton.clicked.connect(self.addModel)
         lyt.addWidget(addModelButton)
-        generateButton = QPushButton("Generate")
-        generateButton.clicked.connect(partial(Model.generate, self.program.scene))
         agButton = QPushButton("Animated Generate")
         agButton.clicked.connect(partial(Model.generate, self.program.scene, True))
-        lyt.addWidget(generateButton)
         lyt.addWidget(agButton)
         saveShotButton = QPushButton("Save A Screenshot")
         saveShotButton.clicked.connect(partial(self.program.saveShot))
+        saveDataButton = QPushButton("Save this result")
+        saveDataButton.clicked.connect(partial(self.program.save))
         lyt.addWidget(saveShotButton)
+        lyt.addWidget(saveDataButton)
         buttonWidget.setLayout(lyt)
         self.menulayout.addWidget(buttonWidget)
 
@@ -119,9 +119,6 @@ class QTWindow(QWidget):
         isWall.currentIndexChanged.connect(partial(model.addLabelUI,
                                                    isWall.currentIndex(),
                                                    optionLayout))
-        # collapse = QPushButton("Collapse")
-        # collapse.clicked.connect(partial(self.toggle, options))
-        # vbox.addWidget(collapse)
         groupBox.setLayout(vbox)
         if len(Model.allModels) < 4:
             self.modelLstLayout.addWidget(groupBox)
@@ -134,15 +131,7 @@ class QTWindow(QWidget):
         picker = QColorDialog()
         if picker.exec_():
             color = picker.selectedColor().getRgbF()
-            print(color)
-            m.model.setColor(color)
-
-    # def toggle(self, widget):
-    #     if widget.height() != 0:
-    #         widget.parentWidget().setFixedHeight(0)
-    #     else:
-    #         widget.setFixedHeight(100)
-
+            m.changeMaterialColor(color)
 
 
 #The resizable widget holding the panda3D window
@@ -175,6 +164,17 @@ class World(ShowBase):
         # Apply scale and position transforms on the model.
         self.scene.setScale(5, 5, 5)
         self.scene.setPos(0, 0, 0)
+        material = Material()
+        material.setShininess(0.5)
+        material.setAmbient((0.2, 0.2, 0.2, 1))
+        material.setDiffuse((0.5, 0.5, 0.5, 1))
+        self.scene.setMaterial(material)
+        self.scene.setShaderAuto()
+        dlight = DirectionalLight('my dlight')
+        dlight.setColor(VBase4(0.8,0.8,0.5,1))
+        self.light = self.render.attachNewNode(dlight)
+        self.light.setHpr(0, -60, 20)
+        self.render.setLight(self.light)
         self.castle = None
         self.taskMgr.add(self.setCameraTask, "SetCameraTask")
 
@@ -220,7 +220,8 @@ class World(ShowBase):
         model.setPos(0, 0, 0)
         model.setScale(1,1,1)
         model.reparentTo(self.scene)
-        modelObj = Model(fileName, model, self.scene)
+        modelObj = Model(fileName, model, self)
+        Model.showBase = self;
         Model.allModels.append(modelObj)
         self.window.addModelUI(modelObj)
 
@@ -248,10 +249,14 @@ class World(ShowBase):
             self.camera.setPos(pos[0] + 1, pos[1], pos[2])
 
     def save(self):
-        self.castle.saveCastleInfo()
+        if self.castle is None:
+            print("No Castle has been generated yet!")
+        else:
+            self.castle.saveCastleInfo()
 
     def saveShot(self):
-        base.win.saveScreenshot(Filename("Screenshots/screenshot.bmp"))
+        base.win.saveScreenshot(Filename("screenshot.bmp"))
+
 
 
 if __name__ == '__main__':
