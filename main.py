@@ -16,16 +16,17 @@ from PySide2.QtCore import *
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Point3, WindowProperties, Material, \
-                            GraphicsWindow, Filename, DirectionalLight, VBase4
+                            GraphicsWindow, Filename, DirectionalLight, VBase4, NodePath
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
 #Python Module imports
 from functools import partial
 import sys
+import json
 
 #Other Module in the project
-from model import Model, Castle
+from model import Model, Castle, Instance
 
 #Constants
 P3D_WIN_WIDTH = 400
@@ -224,7 +225,7 @@ class World(ShowBase):
         model.setScale(1,1,1)
         model.reparentTo(self.scene)
         modelObj = Model(fileName, model, self)
-        Model.showBase = self;
+        Model.showBase = self
         Model.allModels.append(modelObj)
         self.window.addModelUI(modelObj)
 
@@ -258,15 +259,76 @@ class World(ShowBase):
         else:
             self.castle.saveCastleInfo()
 
+    #This method loads the json file into the scene
     def load(self):
+        #Open file Dialog
         dialog = QFileDialog(None)
         dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        content = ""
         if dialog.exec_():
             fileName = dialog.selectedFiles()[0]
             f = open(fileName, "r+")
             content = f.read()
             f.close()
-            self.castle.load(content)
+
+        #loads data from json-formated data
+        data = json.loads(content)
+        d = {
+            "Wall": list(),
+            "Tower": list(),
+            "MainBody": list(),
+            "Roof": list()
+        }
+
+        #Removes the current content in scene
+        node = self.scene.find("test")
+        try:
+            node.detachNode()
+        except:
+            print("A generation result does not exist yet")
+
+        # clears UI
+        Model.clearLayout(self.window.modelLstLayout)
+        Model.clearLayout(self.window.modelLstLayout2)
+
+        #Creates a new model cluster
+        dummy = NodePath("test")
+        typeToInstances = dict()
+        for key in d:
+            parent = dummy.attachNewNode("Bodies")
+            path = data.get(key).get("model")
+            color = data.get(key).get("color")
+            model = self.loader.loadModel(path)
+            material = Material()
+            material.setShininess(0.0)
+            material.setAmbient((0.2, 0, 0, 1))
+            material.setDiffuse((color[0], color[1], color[2], color[3]))
+            model.setMaterial(material)
+            modelObj = Model(path, model, self)
+            Model.showBase = self
+            Model.allModels.append(modelObj)
+            self.window.addModelUI(modelObj)
+            locations = data.get(key).get("locations")
+            scales = data.get(key).get("scale")
+            rotations = data.get(key).get("rotation")
+            for i in range(len(locations)):
+                location = (locations[i][0], locations[i][1], locations[i][2])
+                scale = (scales[i][0], scales[i][1], scales[i][2])
+                rotation = (rotations[i][0], rotations[i][1], rotations[i][2])
+                instance = Instance(model, parent, location, rotation,
+                                        scale=scale)
+                instance.instantiate()
+                instancies = typeToInstances.get(key, list())
+                instancies.append(instance)
+                typeToInstances["Wall"] = instancies
+        castle = Castle(typeToInstances, dummy, self.scene)
+        self.castle = castle
+        castle.instantiate()
+
+
+
+
+
 
     def saveShot(self):
         base.win.saveScreenshot(Filename("screenshot.bmp"))
