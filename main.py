@@ -16,7 +16,8 @@ from PySide2.QtCore import *
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import Point3, WindowProperties, Material, \
-                            GraphicsWindow, Filename, DirectionalLight, VBase4, NodePath
+                            GraphicsWindow, Filename, DirectionalLight,\
+                            VBase4, NodePath, ShadeModelAttrib
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
@@ -182,6 +183,8 @@ class World(ShowBase):
         self.castle = None
         self.taskMgr.add(self.setCameraTask, "SetCameraTask")
 
+
+
         #Refering to the front-end
         self.window = None
 
@@ -195,6 +198,7 @@ class World(ShowBase):
         self.accept("a-repeat", self.move, ["left"])
         self.accept("d-repeat", self.move, ["right"])
         self.accept("s", self.save)
+        self.accept("p", self.viewFloorPlan)
 
 
     #Set the initial camera position
@@ -204,8 +208,13 @@ class World(ShowBase):
         self.camLens.setFocalLength(0.1)
         return Task.done
 
-    def animatedGeneration(self):
-        pass
+    def viewFloorPlan(self):
+        test = self.scene.find("test")
+        test.setRenderModeWireframe()
+        print("Test is:", test)
+        floors = test.find("Floors")
+        print("Floor is:", floors)
+        floors.setRenderMode(ShadeModelAttrib.MSmooth, 2.0)
 
 
     #Bind Panda3D window to QtWindow
@@ -324,11 +333,6 @@ class World(ShowBase):
         castle = Castle(typeToInstances, dummy, self.scene)
         self.castle = castle
         castle.instantiate()
-
-
-
-
-
 
     def saveShot(self):
         base.win.saveScreenshot(Filename("screenshot.bmp"))

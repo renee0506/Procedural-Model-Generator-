@@ -3,7 +3,8 @@ from PySide2.QtWidgets import *
 from PySide2.QtCore import *
 
 #Panda3D imports
-from panda3d.core import Point3, WindowProperties, Material, NodePath
+from panda3d.core import Point3, WindowProperties, Material, NodePath,\
+                        GeomNode
 from pandac.PandaModules import loadPrcFileData
 loadPrcFileData("", "window-type none")
 
@@ -12,6 +13,8 @@ from functools import partial
 import random, math
 import threading, time
 import json
+
+from Geometry import *
 
 class Model(object):
     #Class attribute holding all models
@@ -274,6 +277,7 @@ class Model(object):
         wallDy = wallYmax - wallYmin
         N = int(wallDx * wallDy / (dx * mainBody.scale[0] * dy * mainBody.scale[0]))
         upperCenters = list()
+        mainBodyBounds = []#For the use of generating floor plan later
         for i in range(N):
             randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
             randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
@@ -295,10 +299,11 @@ class Model(object):
             upperCenters.append((min_x + (max_x - min_x) / 2,
                                  min_y + (max_y - min_y) / 2,
                                  max_z))
+            mainBodyBounds.append(bounds)
         #Hide MainBody Model
         mainBody.model.detachNode()
 
-        roofs = dummy.attachNewNode("Bodies")
+        roofs = dummy.attachNewNode("Roofs")
         roofs.setPos(0, 0, 0)
         #Generate Roof
         for center in upperCenters:
@@ -312,6 +317,21 @@ class Model(object):
             typeToInstances["Roof"] = roofInstancies
         #Hide the initial roof model
         roof.model.detachNode()
+
+        #Floor Plan
+        floors = dummy.attachNewNode("Floors")
+        for i in range(0, 2 * len(mainBodyBounds)):
+            bound = random.choices(mainBodyBounds)
+            z = random.uniform(bounds[0][2], bounds[1][2])
+            x1 = bounds[0][0]
+            x2 = bounds[1][0]
+            y1 = bounds[0][1]
+            y2 = bounds[1][1]
+            floor = makeSquare(x1, y1, z, x2, y2, z)
+            floorNode = GeomNode("floor")
+            floorNode.addGeom(floor)
+            floors.attachNewNode(floorNode)
+
         castle = Castle(typeToInstances, dummy, scene)
         Model.showBase.castle = castle
         if not animated:
