@@ -15,6 +15,7 @@ import threading, time
 import json
 
 from Geometry import *
+import UI
 
 class Model(object):
     #Class attribute holding all models
@@ -33,10 +34,7 @@ class Model(object):
         self.label = "Wall"
         #Assign a default material
         self.model.setColor((1,0,0,1))
-        self.material = Material()
-        self.material.setShininess(0.0)
-        self.material.setAmbient((0.2,0,0,1))
-        self.material.setDiffuse((0.5,0,0,1))
+        self.material = defaultMaterial()
         self.model.setMaterial(self.material)
         self.model.setShaderAuto()
         self.width = 1
@@ -44,7 +42,7 @@ class Model(object):
         self.height = 1
         self.scale = (1,1,1)
         self.nOfSections = 20
-        self.randomness = 20
+        self.randomness = 1
         self.color = (1,0,0,1)
         self.parent = parent.scene
         self.showParams = True
@@ -63,15 +61,7 @@ class Model(object):
     # Add Label-Specific UI
     def addLabelUI(self, dummy, layout, index):
         Model.clearLayout(layout)
-        scale = QSlider(Qt.Horizontal)
-        scaleLabel = QLabel("Scale")
-        scale.setMinimum(10)
-        scale.setMaximum(50)
-        scale.valueChanged.connect(
-            partial(self.changeScale, scale.value())
-        )
-        layout.addWidget(scaleLabel)
-        layout.addWidget(scale)
+        UI.addScaleSlider(self, layout)
         if Model.switcher.get(index) == "Wall":  # If it is wall
             widthLabel = QLabel("Width")
             width = QSlider(Qt.Horizontal)
@@ -98,8 +88,7 @@ class Model(object):
             layout.addWidget(width)
             layout.addWidget(lengthLabel)
             layout.addWidget(length)
-        elif Model.switcher.get(index) == "Tower": # If it is Pole
-            #TODO: WRITE THE BACKEND PART OF THIS CODE
+        elif Model.switcher.get(index) == "Tower": # If it is Tower
             heightLabel = QLabel("Height")
             height = QSlider(Qt.Horizontal)
             height.setMinimum(10)
@@ -155,13 +144,19 @@ class Model(object):
     #Read the New Length Value
     def changeHValue(self, state, h):
         self.height = h /10.0
-        Model.generate(self.parent)
+        if self.label != "MainBody":
+            Model.generate(self.parent, regenerateBody = False)
+        else:
+            Model.generate(self.parent)
 
     #Change the scale of the model
     def changeScale(self, state, s):
         s = s / 10.0
         self.scale = (s, s, s)
-        Model.generate(self.parent)
+        if self.label == "Wall" or self.label == "Tower":
+            Model.generate(self.parent, regenerateBody=False)
+        else:
+            Model.generate(self.parent)
 
     # For mainBody Only, change the number of sections of the body
     def changeNofSections(self, state, sec):
@@ -175,8 +170,21 @@ class Model(object):
 
 
     @staticmethod
-    def generate(scene, animated=False):
-        node = scene.find("test")
+    def generate(scene, animated=False, regenerateBody = True):
+
+        bodiesNode = None
+        innerNode = None
+        roofsNode = None
+        try:
+            node = scene.find("test")
+            if not regenerateBody:
+                bodiesNode = node.find("Bodies")
+                innerNode = node.find("Floors")
+                roofsNode = node.find("Roofs")
+        except:
+            print("A generation result does not exist yet")
+
+
         try:
             node.detachNode()
         except:
@@ -264,73 +272,95 @@ class Model(object):
         tower.model.detachNode()
 
         #Generate MainBody
-        bodies = dummy.attachNewNode("Bodies")
-        bodies.setPos(0,0,0)
-        bodyBound = mainBody.model.getTightBounds()
-        dx = bodyBound[1][0] - bodyBound[0][0]
-        dy = bodyBound[1][1] - bodyBound[0][1]
-        wallXmin = wallBounds[0][0]
-        wallYmin = wallBounds[0][1]
-        wallXmax = wallBounds[1][0]
-        wallYmax = wallBounds[1][1]
-        wallDx = wallXmax - wallXmin
-        wallDy = wallYmax - wallYmin
-        N = int(wallDx * wallDy / (dx * mainBody.scale[0] * dy * mainBody.scale[0]))
-        upperCenters = list()
-        mainBodyBounds = []#For the use of generating floor plan later
-        for i in range(N):
-            randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
-            randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
-            randZ = random.uniform(0, mainBody.randomness)
-            pos = (randX, randY, 0)
-            scale = (mainBody.scale[0], mainBody.scale[1],
-                     mainBody.scale[2] * mainBody.height * (1 - 0.1 * randZ))
-            mainBodyInstance = Instance(mainBody.model, bodies, pos, scale = scale)
-            mainBodyInstance.instantiate()
-            mainBodyInstancies = typeToInstances.get("MainBody", list())
-            mainBodyInstancies.append(mainBodyInstance)
-            typeToInstances["MainBody"] = mainBodyInstancies
+        if not regenerateBody and bodiesNode is not None \
+                and innerNode is not None and roofsNode is not None:
+            bodiesNode.reparentTo(dummy)
+            innerNode.reparentTo(dummy)
+            roofsNode.reparentTo(dummy)
+        else:
+            bodies = dummy.attachNewNode("Bodies")
+            bodies.setPos(0,0,0)
+            bodyBound = mainBody.model.getTightBounds()
+            dx = bodyBound[1][0] - bodyBound[0][0]
+            dy = bodyBound[1][1] - bodyBound[0][1]
+            wallXmin = wallBounds[0][0]
+            wallYmin = wallBounds[0][1]
+            wallXmax = wallBounds[1][0]
+            wallYmax = wallBounds[1][1]
+            wallDx = wallXmax - wallXmin
+            wallDy = wallYmax - wallYmin
+            N = int(wallDx * wallDy / (dx * mainBody.scale[0] * dy * mainBody.scale[0]))
+            upperCenters = list()
+            mainBodyBounds = []#For the use of generating floor plan later
+            for i in range(N):
+                randX = random.uniform(wallXmin + dx / 2, wallXmax - dx / 2)
+                randY = random.uniform(wallYmin + dy / 2, wallYmax - dy / 2)
+                randZ = random.uniform(0, mainBody.randomness)
+                pos = (randX, randY, 0)
+                scale = (mainBody.scale[0], mainBody.scale[1],
+                         mainBody.scale[2] * mainBody.height * (1 - 0.1 * randZ))
+                mainBodyInstance = Instance(mainBody.model, bodies, pos, scale = scale)
+                mainBodyInstance.instantiate()
+                mainBodyInstancies = typeToInstances.get("MainBody", list())
+                mainBodyInstancies.append(mainBodyInstance)
+                typeToInstances["MainBody"] = mainBodyInstancies
 
-            bounds = mainBodyInstance.getTightBounds()
-            min_x, min_y, min_z = bounds[0][0], bounds[0][1], \
-                                  bounds[0][2]
-            max_x, max_y, max_z = bounds[1][0], bounds[1][1], \
-                                  bounds[1][2]
-            upperCenters.append((min_x + (max_x - min_x) / 2,
-                                 min_y + (max_y - min_y) / 2,
-                                 max_z))
-            mainBodyBounds.append(bounds)
+                bounds = mainBodyInstance.getTightBounds()
+                min_x, min_y, min_z = bounds[0][0], bounds[0][1], \
+                                      bounds[0][2]
+                max_x, max_y, max_z = bounds[1][0], bounds[1][1], \
+                                      bounds[1][2]
+                upperCenters.append((min_x + (max_x - min_x) / 2,
+                                     min_y + (max_y - min_y) / 2,
+                                     max_z))
+                mainBodyBounds.append(bounds)
         #Hide MainBody Model
-        mainBody.model.detachNode()
+            mainBody.model.detachNode()
 
-        roofs = dummy.attachNewNode("Roofs")
-        roofs.setPos(0, 0, 0)
-        #Generate Roof
-        for center in upperCenters:
-            pos = (center[0], center[1], center[2])
-            scale = (roof.scale[0], roof.scale[1],
-                     roof.scale[2] * roof.height)
-            roofInstance = Instance(roof.model, roofs, pos, scale = scale)
-            roofInstance.instantiate()
-            roofInstancies = typeToInstances.get("Roof", list())
-            roofInstancies.append(roofInstance)
-            typeToInstances["Roof"] = roofInstancies
+            roofs = dummy.attachNewNode("Roofs")
+            roofs.setPos(0, 0, 0)
+            #Generate Roof
+            for center in upperCenters:
+                pos = (center[0], center[1], center[2])
+                scale = (roof.scale[0], roof.scale[1],
+                         roof.scale[2] * roof.height)
+                roofInstance = Instance(roof.model, roofs, pos, scale = scale)
+                roofInstance.instantiate()
+                roofInstancies = typeToInstances.get("Roof", list())
+                roofInstancies.append(roofInstance)
+                typeToInstances["Roof"] = roofInstancies
         #Hide the initial roof model
-        roof.model.detachNode()
+            roof.model.detachNode()
 
         #Floor Plan
-        floors = dummy.attachNewNode("Floors")
-        for i in range(0, 2 * len(mainBodyBounds)):
-            bound = random.choices(mainBodyBounds)
-            z = random.uniform(bounds[0][2], bounds[1][2])
-            x1 = bounds[0][0]
-            x2 = bounds[1][0]
-            y1 = bounds[0][1]
-            y2 = bounds[1][1]
-            floor = makeSquare(x1, y1, z, x2, y2, z)
-            floorNode = GeomNode("floor")
-            floorNode.addGeom(floor)
-            floors.attachNewNode(floorNode)
+            floors = dummy.attachNewNode("Floors")
+            for i in range(0, 2 * len(mainBodyBounds)):
+                bound = random.choices(mainBodyBounds)[0]
+                z = random.uniform(bound[0][2], bound[1][2])
+                x1 = bound[0][0]
+                x2 = bound[1][0]
+                y1 = bound[0][1]
+                y2 = bound[1][1]
+                floor = makeSquare(x1, y1, z, x2, y2, z)
+                floorNode = GeomNode("floor")
+                floorNode.addGeom(floor)
+                innerWallNode = GeomNode("innerWall")
+                for i in range(5):#arbitary times of generation
+                    x = random.choice(range(int(bound[0][0] * 10), int(bound[1][0] * 10), int((bound[1][0] - bound[0][0]))))/10.0
+                    y = random.choice(range(int(bound[0][1] * 10), int(bound[1][1] * 10), int((bound[1][1] - bound[0][1]))))/10.0
+                    alignWithY = random.choice([True,False])
+                    if alignWithY:
+                        innerWall = makeSquare(bound[0][0], y, z, x, y, z + 0.5)
+                    else:
+                        innerWall = makeSquare(x, bound[0][1], z, x, y, z + 0.5)
+                    innerWallNode.addGeom(innerWall)
+
+                innerWalls = floors.attachNewNode(innerWallNode)
+                innerWalls.setMaterial(defaultMaterial())
+                innerWalls.setTwoSided(True)
+                floorNodePath = floors.attachNewNode(floorNode)
+                floorNodePath.setMaterial(defaultMaterial())
+                floorNodePath.setTwoSided(True)
 
         castle = Castle(typeToInstances, dummy, scene)
         Model.showBase.castle = castle

@@ -1,6 +1,9 @@
 from panda3d.core import GeomVertexFormat, GeomVertexData
 from panda3d.core import Geom, GeomTriangles, GeomVertexWriter
 from panda3d.core import LVector3
+from panda3d.core import Material
+
+import random
 
 # taken from Panda3D example Procedural Cube
 def normalized(*args):
@@ -10,7 +13,6 @@ def normalized(*args):
 
 # helper function to make a square given the Lower-Left-Hand and
 # Upper-Right-Hand corners taken from Panda3D example Procedural Cube
-
 def makeSquare(x1, y1, z1, x2, y2, z2):
     format = GeomVertexFormat.getV3n3cpt2()
     vdata = GeomVertexData('square', format, Geom.UHDynamic)
@@ -64,4 +66,13 @@ def makeSquare(x1, y1, z1, x2, y2, z2):
     square = Geom(vdata)
     square.addPrimitive(tris)
     return square
+
+def defaultMaterial():
+    material = Material()
+    material.setShininess(0.0)
+    material.setAmbient((0.2, 0, 0, 1))
+    rand = random.uniform(0,1)
+    material.setDiffuse((rand, rand, rand, 1))
+    return material
+
 

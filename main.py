@@ -25,6 +25,7 @@ loadPrcFileData("", "window-type none")
 from functools import partial
 import sys
 import json
+from Geometry import *
 
 #Other Module in the project
 from model import Model, Castle, Instance
@@ -169,11 +170,7 @@ class World(ShowBase):
         # Apply scale and position transforms on the model.
         self.scene.setScale(5, 5, 5)
         self.scene.setPos(0, 0, 0)
-        material = Material()
-        material.setShininess(0.5)
-        material.setAmbient((0.2, 0.2, 0.2, 1))
-        material.setDiffuse((0.5, 0.5, 0.5, 1))
-        self.scene.setMaterial(material)
+        self.scene.setMaterial(defaultMaterial())
         self.scene.setShaderAuto()
         dlight = DirectionalLight('my dlight')
         dlight.setColor(VBase4(0.8,0.8,0.5,1))
@@ -206,6 +203,8 @@ class World(ShowBase):
         self.camera.setPos(0, -200, 220)
         self.camera.setHpr(0, -50, 0)
         self.camLens.setFocalLength(0.1)
+        base.setBackgroundColor(236 / 255.0, 236 / 255.0, 236 / 255.0,
+                                1.0)
         return Task.done
 
     def viewFloorPlan(self):
@@ -340,6 +339,9 @@ class World(ShowBase):
 
 
 if __name__ == '__main__':
+    '''The following set up code is adapted from:
+    https: // discourse.panda3d.org/t/using-panda3d-
+    with-pyqt-or-pygtk-possible/6170'''
     world = World()
     app = QApplication(sys.argv)
     form = QTWindow(world)
