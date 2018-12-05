@@ -180,6 +180,9 @@ class World(ShowBase):
         self.castle = None
         self.taskMgr.add(self.setCameraTask, "SetCameraTask")
 
+        #Viewing Mode
+        self.viewInside = False
+
 
 
         #Refering to the front-end
@@ -209,11 +212,14 @@ class World(ShowBase):
 
     def viewFloorPlan(self):
         test = self.scene.find("test")
-        test.setRenderModeWireframe()
-        print("Test is:", test)
         floors = test.find("Floors")
-        print("Floor is:", floors)
-        floors.setRenderMode(ShadeModelAttrib.MSmooth, 2.0)
+        if not self.viewInside:
+            test.setRenderModeWireframe()
+            floors.setRenderMode(ShadeModelAttrib.MSmooth, 2.0)
+            self.viewInside = not self.viewInside
+        else:
+            test.setRenderMode(ShadeModelAttrib.MSmooth, 2.0)
+            self.viewInside = not self.viewInside
 
 
     #Bind Panda3D window to QtWindow
